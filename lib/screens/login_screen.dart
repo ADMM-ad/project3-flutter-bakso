@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'Sign In',
+                      'Login',
                       style: TextStyle(
                         fontSize: 42,
                         fontWeight: FontWeight.bold,
@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Selamat datang di Aplikasi POS Bakso',
+                      'Selamat datang di Aplikasi Bakso',
                       style: TextStyle(
                         fontSize: 16,
                         color: const Color(0xFF3B4953),

@@ -36,19 +36,24 @@ class _HomeScreenState extends State<HomeScreen> {
       final startOfMonth = DateTime(now.year, now.month, 1);
       final endOfMonth = DateTime(now.year, now.month + 1, 0); // Hari terakhir bulan ini
 
-      // Hitung transaksi bulan ini
+      // Ambil semua transaksi
       final transaksiList = await TransaksiService.getAllTransaksi();
+
+      // Filter transaksi bulan ini
       final transaksiBulanIni = transaksiList.where((t) {
         return t.tanggal.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
             t.tanggal.isBefore(endOfMonth.add(const Duration(days: 1)));
-      }).length;
+      }).toList();
 
-      // Hitung jumlah menu
-      final menuList = await MenuService.getAllMenu();
+      // Hitung jumlah transaksi bulan ini
+      final jumlahTransaksi = transaksiBulanIni.length;
+
+      // Hitung total qty terjual bulan ini (sum semua qty)
+      final totalQtyTerjual = transaksiBulanIni.fold<int>(0, (sum, t) => sum + t.qty);
 
       setState(() {
-        _jumlahTransaksiBulanIni = transaksiBulanIni;
-        _jumlahMenu = menuList.length;
+        _jumlahTransaksiBulanIni = jumlahTransaksi;
+        _jumlahMenu = totalQtyTerjual; // <--- Diubah jadi total qty, bukan jumlah menu
         _isLoadingStats = false;
       });
     } catch (e) {
@@ -165,8 +170,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 20),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.restaurant_menu,
-                        title: 'Jumlah Menu',
+                        icon: Icons.ramen_dining, // Icon lebih relevan untuk bakso/mangkok terjual
+                        // atau Icons.shopping_cart, Icons.bar_chart, atau Icons.trending_up
+                        title: 'Menu Bulan Ini',
                         value: _isLoadingStats ? '...' : _jumlahMenu.toString(),
                       ),
                     ),

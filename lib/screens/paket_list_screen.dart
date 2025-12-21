@@ -72,6 +72,12 @@ class _PaketListScreenState extends State<PaketListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Data Alamat'), // <--- Header baru
+        backgroundColor: const Color(0xFF5A7863),
+        foregroundColor: Colors.white,
+        // Tombol kembali otomatis muncul karena halaman ini dipush dari halaman lain
+      ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -95,7 +101,7 @@ class _PaketListScreenState extends State<PaketListScreen> {
                 if (pakets.isEmpty) {
                   return const Center(
                     child: Text(
-                      'Belum ada paket.\nTekan tombol + untuk menambahkan.',
+                      'Belum ada alamat.\nTekan tombol + untuk menambahkan.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 18, color: Color(0xFF3B4953)),
                     ),
@@ -255,6 +261,7 @@ class _PaketListScreenState extends State<PaketListScreen> {
         child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Tambah Alamat Baru',
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

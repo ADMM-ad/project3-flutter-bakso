@@ -101,7 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Daftar untuk mengelola POS Bakso',
+                      'Daftar untuk mengelola Aplikasi Bakso',
                       style: TextStyle(
                         fontSize: 16,
                         color: const Color(0xFF3B4953),

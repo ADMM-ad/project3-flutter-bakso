@@ -262,6 +262,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                       controller: _namaController,
                       style: const TextStyle(color: Color(0xFF3B4953)),
                       decoration: InputDecoration(
+                        labelText: 'Nama Pelanggan',
                         hintText: 'Nama Pelanggan',
                         hintStyle: const TextStyle(color: Color(0xFF3B4953)),
                         filled: true,
@@ -284,6 +285,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                           focusNode: focusNode,
                           style: const TextStyle(color: Color(0xFF3B4953)),
                           decoration: InputDecoration(
+                            labelText: 'Alamat',
                             hintText: 'Pilih Alamat',
                             hintStyle: const TextStyle(color: Color(0xFF3B4953)),
                             filled: true,
@@ -296,7 +298,10 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                           ),
                         );
                       },
-                      suggestionsCallback: (pattern) async => await PaketService.getAllPaket(),
+                      suggestionsCallback: (pattern) async {
+                        final pakets = await PaketService.getAllPaket();
+                        return pakets.where((menu) => menu.namaPaket.toLowerCase().contains(pattern.toLowerCase())).toList();
+                      },
                       itemBuilder: (context, paket) => ListTile(
                         title: Text(paket.namaPaket, style: const TextStyle(color: Color(0xFF3B4953))),
                         subtitle: Text(paket.keterangan, style: const TextStyle(color: Color(0xFF3B4953))),
@@ -314,6 +319,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                           focusNode: focusNode,
                           style: const TextStyle(color: Color(0xFF3B4953)),
                           decoration: InputDecoration(
+                            labelText: 'Menu',
                             hintText: 'Pilih Menu',
                             hintStyle: const TextStyle(color: Color(0xFF3B4953)),
                             filled: true,
@@ -326,7 +332,10 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                           ),
                         );
                       },
-                      suggestionsCallback: (pattern) async => await MenuService.getAllMenu(),
+                      suggestionsCallback: (pattern) async {
+                        final menus = await MenuService.getAllMenu();
+                        return menus.where((menu) => menu.namaMenu.toLowerCase().contains(pattern.toLowerCase())).toList();
+                      },
                       itemBuilder: (context, menu) => ListTile(
                         title: Text(menu.namaMenu, style: const TextStyle(color: Color(0xFF3B4953))),
                         subtitle: Text('Rp ${menu.hargaSatuan}', style: const TextStyle(color: Color(0xFF90AB8B))),
@@ -346,6 +355,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: Color(0xFF3B4953)),
                       decoration: InputDecoration(
+                        labelText: 'Banyaknya',
                         hintText: 'Qty',
                         hintStyle: const TextStyle(color: Color(0xFF3B4953)),
                         filled: true,
@@ -366,6 +376,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: Color(0xFF3B4953)),
                       decoration: InputDecoration(
+                        labelText: 'Harga Satuan',
                         hintText: 'Harga',
                         hintStyle: const TextStyle(color: Color(0xFF3B4953)),
                         filled: true,
@@ -385,6 +396,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: Color(0xFF3B4953), fontWeight: FontWeight.bold),
                       decoration: InputDecoration(
+                        labelText: 'Total Keseluruhan',
                         hintText: 'Total Item Ini',
                         hintStyle: const TextStyle(color: Color(0xFF3B4953)),
                         filled: true,

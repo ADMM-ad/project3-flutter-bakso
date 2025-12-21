@@ -177,28 +177,44 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
   Future<void> _saveTransaksi() async {
     if (_namaController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama pelanggan wajib diisi')),
+        const SnackBar(
+          content: Text('Nama pelanggan wajib diisi'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     if (_menuItems.isNotEmpty && _selectedPaket == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Jika ada menu tambahan, harus pilih alamat terlebih dahulu')),
+        const SnackBar(
+          content: Text('Pilih alamat terlebih dahulu'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     if (_selectedPaket != null && _menuItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Minimal tambahkan 1 menu untuk alamat')),
+        const SnackBar(
+          content: Text('Minimal tambahkan 1 menu'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     if (_selectedPaket == null && _menuItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pilih alamat dan tambahkan minimal 1 menu')),
+        const SnackBar(
+          content: Text('Pilih alamat dan tambahkan minimal 1 menu'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -381,7 +397,10 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                           ),
                         );
                       },
-                      suggestionsCallback: (pattern) async => await PaketService.getAllPaket(),
+                      suggestionsCallback: (pattern) async {
+                        final pakets = await PaketService.getAllPaket();
+                        return pakets.where((menu) => menu.namaPaket.toLowerCase().contains(pattern.toLowerCase())).toList();
+                      },
                       itemBuilder: (context, paket) => ListTile(
                         title: Text(paket.namaPaket, style: const TextStyle(color: Color(0xFF3B4953))),
                         subtitle: Text(paket.keterangan, style: const TextStyle(color: Color(0xFF3B4953))),

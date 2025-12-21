@@ -49,6 +49,12 @@ class _MenuListScreenState extends State<MenuListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Data Menu'), // <--- Header baru
+        backgroundColor: const Color(0xFF5A7863),
+        foregroundColor: Colors.white,
+        // Tombol kembali otomatis muncul karena halaman ini dipush dari halaman lain
+      ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -252,6 +258,7 @@ class _MenuListScreenState extends State<MenuListScreen> {
         child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Tambah Menu',
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

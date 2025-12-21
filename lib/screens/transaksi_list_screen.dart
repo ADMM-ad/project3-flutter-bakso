@@ -204,7 +204,7 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Paket: ${t.paketNama ?? '-'}',
+                                    'Alamat: ${t.paketNama ?? '-'}',
                                     style: const TextStyle(fontSize: 14, color: Color(0xFF3B4953)),
                                   ),
                                   Text(
@@ -212,7 +212,7 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
                                     style: const TextStyle(fontSize: 14, color: Color(0xFF3B4953)),
                                   ),
                                   Text(
-                                    'Qty: ${t.qty} | Harga: Rp ${t.harga} | Total: Rp ${t.total}',
+                                    'Banyaknya: ${t.qty} | Harga Satuan: Rp ${t.harga} | Total Keseluruhan: Rp ${t.total}',
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
