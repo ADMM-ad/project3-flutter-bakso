@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Tambahkan package intl untuk format tanggal
+import 'package:intl/intl.dart';
 import 'package:apk_bakso/models/transaksi.dart';
 import 'package:apk_bakso/services/transaksi_service.dart';
 import 'package:apk_bakso/screens/transaksi_form_screen.dart';
 import 'package:apk_bakso/screens/transaksi_edit_screen.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class TransaksiListScreen extends StatefulWidget {
   const TransaksiListScreen({super.key});
@@ -15,12 +20,8 @@ class TransaksiListScreen extends StatefulWidget {
 class _TransaksiListScreenState extends State<TransaksiListScreen> {
   late Future<List<Transaksi>> futureTransaksi;
   DateTimeRange _dateRange = DateTimeRange(
-    start: DateTime(DateTime.now().year, DateTime.now().month, 1), // Awal bulan ini
-    end: DateTime(
-      DateTime.now().year,
-      DateTime.now().month + 1,
-      0, // tanggal terakhir bulan ini
-    ),
+    start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+    end: DateTime.now(),
   );
 
   @override
@@ -40,13 +41,11 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
       context: context,
       initialDateRange: _dateRange,
       firstDate: DateTime(2020),
-      lastDate: DateTime(DateTime.now().year + 1),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF90AB8B),
-            ),
+            colorScheme: const ColorScheme.light(primary: Color(0xFF90AB8B)),
           ),
           child: child!,
         );
@@ -57,11 +56,10 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
       setState(() {
         _dateRange = picked;
       });
-      _loadTransaksi(); // Reload data
+      _loadTransaksi();
     }
   }
 
-  // Filter data berdasarkan date range
   List<Transaksi> _filterTransaksi(List<Transaksi> allTransaksi) {
     return allTransaksi.where((t) {
       final tanggal = t.tanggal;
@@ -108,6 +106,69 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Fungsi baru: Cetak PDF Struk Transaksi
+  Future<void> _printStrukTransaksi(Transaksi t) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.SizedBox(height: 8),
+              pw.Text('Alamat : ${t.paketNama ?? '-'}'),
+              pw.Text('Tanggal : ${DateFormat('dd/MM/yyyy').format(t.tanggal)}'),
+              pw.Text('Nama Pelanggan : ${t.nama}'),
+              pw.SizedBox(height: 20),
+              pw.Table(
+                border: pw.TableBorder.all(),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Menu', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Qty', style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Harga', style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
+                    ],
+                  ),
+                  ...t.details.map((detail) {
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(detail.menuNama)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(detail.qty.toString(), textAlign: pw.TextAlign.center)),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Rp ${detail.harga}', textAlign: pw.TextAlign.right)),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'Total Keseluruhan: Rp ${t.total}',
+                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+
+            ],
+          );
+        },
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/struk_transaksi_${t.id}.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'struk_transaksi_${t.id}.pdf',
     );
   }
 
@@ -199,7 +260,7 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '${t.tanggal.toLocal().toString().split(' ')[0]}',
+                                    DateFormat('dd/MM/yyyy').format(t.tanggal),
                                     style: const TextStyle(fontSize: 14, color: Color(0xFF3B4953)),
                                   ),
                                   const SizedBox(height: 4),
@@ -207,12 +268,30 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
                                     'Alamat: ${t.paketNama ?? '-'}',
                                     style: const TextStyle(fontSize: 14, color: Color(0xFF3B4953)),
                                   ),
+                                  const SizedBox(height: 8),
+                                  if (t.details.isNotEmpty)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Menu Pesanan:',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF3B4953)),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        ...t.details.map((detail) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(left: 8, bottom: 4),
+                                            child: Text(
+                                              '• ${detail.menuNama} x${detail.qty} Rp ${detail.harga}',
+                                              style: const TextStyle(fontSize: 13, color: Color(0xFF3B4953)),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ],
+                                    ),
+                                  const SizedBox(height: 8),
                                   Text(
-                                    'Menu: ${t.menuNama ?? '-'}',
-                                    style: const TextStyle(fontSize: 14, color: Color(0xFF3B4953)),
-                                  ),
-                                  Text(
-                                    'Banyaknya: ${t.qty} | Harga Satuan: Rp ${t.harga} | Total Keseluruhan: Rp ${t.total}',
+                                    'Total Keseluruhan: Rp ${t.total}',
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
@@ -224,6 +303,7 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
                             ),
                             Column(
                               children: [
+                                // Tombol Edit
                                 GestureDetector(
                                   onTap: () async {
                                     final result = await Navigator.push(
@@ -246,6 +326,20 @@ class _TransaksiListScreenState extends State<TransaksiListScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 10),
+                                // Tombol PDF (baru)
+                                GestureDetector(
+                                  onTap: () => _printStrukTransaksi(t),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.picture_as_pdf, color: Colors.green, size: 20),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                // Tombol Hapus
                                 GestureDetector(
                                   onTap: () => _confirmDelete(t),
                                   child: Container(

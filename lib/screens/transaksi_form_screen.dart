@@ -3,6 +3,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:apk_bakso/models/menu.dart';
 import 'package:apk_bakso/models/paket.dart';
 import 'package:apk_bakso/models/transaksi.dart';
+import 'package:apk_bakso/models/detail_transaksi.dart';
 import 'package:apk_bakso/services/menu_service.dart';
 import 'package:apk_bakso/services/paket_service.dart';
 import 'package:apk_bakso/services/transaksi_service.dart';
@@ -21,36 +22,37 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
   final TextEditingController _totalController = TextEditingController(text: '0');
 
   Paket? _selectedPaket;
-  List<Map<String, dynamic>> _menuItems = [];
-  int _total = 0;
+  List<DetailTransaksi> _details = [];
+  int _autoCalculatedTotal = 0;
+  bool _isTotalManual = false; // Tandai jika user edit manual total
 
   @override
   void dispose() {
     _namaController.dispose();
     _totalController.dispose();
-    for (var item in _menuItems) {
-      item['hargaController'].dispose();
-    }
     super.dispose();
   }
 
-  void _calculateTotal() {
+  void _calculateAutoTotal() {
     int newTotal = 0;
-    for (var item in _menuItems) {
-      final harga = int.tryParse(item['hargaController'].text) ?? 0;
-      newTotal += harga;
+    for (var detail in _details) {
+      newTotal += detail.harga; // harga sudah = harga_satuan × qty
     }
 
-    setState(() {
-      _total = newTotal;
-      _totalController.text = newTotal.toString();
-    });
+    _autoCalculatedTotal = newTotal;
+
+    // Update field total hanya jika belum diedit manual
+    if (!_isTotalManual) {
+      setState(() {
+        _totalController.text = newTotal.toString();
+      });
+    }
   }
 
   void _addMenuItem() async {
     Menu? selectedMenu;
     final qtyController = TextEditingController(text: '1');
-    final hargaController = TextEditingController();
+    final subtotalController = TextEditingController(); // Hasil perkalian (bisa edit manual)
 
     final result = await showDialog<bool>(
       context: context,
@@ -66,6 +68,9 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                   children: [
                     TypeAheadField<Menu>(
                       builder: (context, controller, focusNode) {
+                        if (selectedMenu != null) {
+                          controller.text = selectedMenu!.namaMenu;
+                        }
                         return TextField(
                           controller: controller,
                           focusNode: focusNode,
@@ -95,8 +100,8 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       onSelected: (menu) {
                         selectedMenu = menu;
                         final qty = int.tryParse(qtyController.text) ?? 1;
-                        final harga = menu.hargaSatuan * qty;
-                        hargaController.text = harga.toString();
+                        final subtotal = menu.hargaSatuan * qty;
+                        subtotalController.text = subtotal.toString();
                         setDialogState(() {});
                       },
                     ),
@@ -117,18 +122,18 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       onChanged: (value) {
                         if (selectedMenu != null) {
                           final qty = int.tryParse(value) ?? 1;
-                          final harga = selectedMenu!.hargaSatuan * qty;
-                          hargaController.text = harga.toString();
+                          final subtotal = selectedMenu!.hargaSatuan * qty;
+                          subtotalController.text = subtotal.toString();
                           setDialogState(() {});
                         }
                       },
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      controller: hargaController,
+                      controller: subtotalController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        hintText: 'Harga satuan',
+                        hintText: 'Total Item',
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.9),
                         border: OutlineInputBorder(
@@ -148,7 +153,7 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                   child: const Text('Batal', style: TextStyle(color: Color(0xFF3B4953))),
                 ),
                 ElevatedButton(
-                  onPressed: selectedMenu == null || hargaController.text.isEmpty ? null : () => Navigator.pop(ctx, true),
+                  onPressed: selectedMenu == null || subtotalController.text.isEmpty ? null : () => Navigator.pop(ctx, true),
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF90AB8B)),
                   child: const Text('Tambah', style: TextStyle(color: Colors.white)),
                 ),
@@ -160,17 +165,20 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
     );
 
     if (result == true && selectedMenu != null) {
+      final newDetail = DetailTransaksi(
+        menuId: selectedMenu!.id,
+        menuNama: selectedMenu!.namaMenu,
+        qty: int.parse(qtyController.text),
+        harga: int.parse(subtotalController.text), // Total item (sudah × qty)
+      );
+
       setState(() {
-        _menuItems.add({
-          'menu': selectedMenu,
-          'qty': int.parse(qtyController.text),
-          'hargaController': hargaController,
-        });
-        _calculateTotal();
+        _details.add(newDetail);
+        _calculateAutoTotal();
       });
     } else {
       qtyController.dispose();
-      hargaController.dispose();
+      subtotalController.dispose();
     }
   }
 
@@ -186,18 +194,7 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
       return;
     }
 
-    if (_menuItems.isNotEmpty && _selectedPaket == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilih alamat terlebih dahulu'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    if (_selectedPaket != null && _menuItems.isEmpty) {
+    if (_details.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Minimal tambahkan 1 menu'),
@@ -208,35 +205,24 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
       return;
     }
 
-    if (_selectedPaket == null && _menuItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilih alamat dan tambahkan minimal 1 menu'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
     try {
-      for (var item in _menuItems) {
-        final transaksi = Transaksi(
-          id: 0,
-          tanggal: _tanggal,
-          nama: _namaController.text.trim(),
-          paketId: _selectedPaket!.id,
-          menuId: item['menu'].id,
-          qty: item['qty'],
-          harga: int.parse(item['hargaController'].text),
-          total: _total,
-        );
-        await TransaksiService.createTransaksi(transaksi);
-      }
+      // Gunakan total dari field (bisa manual) atau auto jika kosong
+      final finalTotal = int.tryParse(_totalController.text) ?? _autoCalculatedTotal;
+
+      final transaksi = Transaksi(
+        id: 0,
+        tanggal: _tanggal,
+        nama: _namaController.text.trim(),
+        paketId: _selectedPaket?.id,
+        paketNama: _selectedPaket?.namaPaket,
+        total: finalTotal,
+        details: _details,
+      );
+
+      await TransaksiService.createTransaksi(transaksi);
 
       if (!mounted) return;
 
-      // Tampilkan SnackBar dulu di form ini
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Transaksi berhasil disimpan!'),
@@ -245,15 +231,10 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
         ),
       );
 
-      // Delay sedikit agar SnackBar terlihat, lalu pop dengan true
       await Future.delayed(const Duration(milliseconds: 800));
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const TransaksiListScreen()),
-              (route) => false, // false = hapus SEMUA halaman sebelumnya
-        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -283,7 +264,6 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
         ),
         child: Column(
           children: [
-            // Header Hijau
             Container(
               width: double.infinity,
               padding: EdgeInsets.only(
@@ -321,14 +301,11 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
-
-            // Form
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
                 child: Column(
                   children: [
-                    // Tanggal
                     Card(
                       elevation: 4,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -350,8 +327,6 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // Nama Pelanggan
                     TextField(
                       controller: _namaController,
                       style: const TextStyle(color: Color(0xFF3B4953)),
@@ -368,11 +343,8 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // Pilih Paket - Nama paket tetap tampil di field
                     TypeAheadField<Paket>(
                       builder: (context, controller, focusNode) {
-                        // Selalu set teks dengan nama paket yang dipilih
                         if (_selectedPaket != null) {
                           controller.text = _selectedPaket!.namaPaket;
                         } else {
@@ -399,30 +371,21 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       },
                       suggestionsCallback: (pattern) async {
                         final pakets = await PaketService.getAllPaket();
-                        return pakets.where((menu) => menu.namaPaket.toLowerCase().contains(pattern.toLowerCase())).toList();
+                        if (pattern.isEmpty) return pakets;
+                        return pakets.where((p) => p.namaPaket.toLowerCase().contains(pattern.toLowerCase())).toList();
                       },
                       itemBuilder: (context, paket) => ListTile(
                         title: Text(paket.namaPaket, style: const TextStyle(color: Color(0xFF3B4953))),
                         subtitle: Text(paket.keterangan, style: const TextStyle(color: Color(0xFF3B4953))),
                       ),
-                      onSelected: (paket) {
-                        setState(() {
-                          _selectedPaket = paket;
-                        });
-                      },
+                      onSelected: (paket) => setState(() => _selectedPaket = paket),
                     ),
                     const SizedBox(height: 32),
-
-                    // Tombol Tambah Menu
                     ElevatedButton.icon(
                       icon: const Icon(Icons.add_circle, color: Colors.white, size: 28),
                       label: const Text(
                         'Tambah Item Menu',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF90AB8B),
@@ -434,17 +397,15 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       onPressed: _addMenuItem,
                     ),
                     const SizedBox(height: 24),
-
-                    // Daftar Item Menu
-                    if (_menuItems.isNotEmpty) ...[
+                    if (_details.isNotEmpty) ...[
                       const Text('Daftar Item Menu:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF3B4953))),
                       const SizedBox(height: 12),
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _menuItems.length,
+                        itemCount: _details.length,
                         itemBuilder: (context, index) {
-                          final item = _menuItems[index];
+                          final detail = _details[index];
                           return Card(
                             elevation: 4,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -454,34 +415,19 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item['menu'].namaMenu, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF3B4953))),
+                                  Text(detail.menuNama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF3B4953))),
                                   const SizedBox(height: 8),
-                                  Text('Qty: ${item['qty']}', style: const TextStyle(color: Color(0xFF3B4953))),
+                                  Text('Banyaknya: ${detail.qty}', style: const TextStyle(color: Color(0xFF3B4953))),
                                   const SizedBox(height: 8),
-                                  TextField(
-                                    controller: item['hargaController'],
-                                    keyboardType: TextInputType.number,
-                                    style: const TextStyle(color: Color(0xFF3B4953)),
-                                    decoration: InputDecoration(
-                                      hintText: 'Harga (edit manual)',
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.8),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    onChanged: (value) => _calculateTotal(),
-                                  ),
+                                  Text('Total Item: Rp ${detail.harga}', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3B4953))),
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: IconButton(
                                       icon: const Icon(Icons.remove_circle, color: Colors.red),
                                       onPressed: () {
                                         setState(() {
-                                          item['hargaController'].dispose();
-                                          _menuItems.removeAt(index);
-                                          _calculateTotal();
+                                          _details.removeAt(index);
+                                          _calculateAutoTotal();
                                         });
                                       },
                                     ),
@@ -494,7 +440,6 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                       ),
                     ],
                     const SizedBox(height: 40),
-
                     TextField(
                       controller: _totalController,
                       keyboardType: TextInputType.number,
@@ -510,12 +455,12 @@ class _TransaksiFormScreenState extends State<TransaksiFormScreen> {
                         ),
                       ),
                       onChanged: (value) {
-                        _total = int.tryParse(value) ?? 0;
+                        setState(() {
+                          _isTotalManual = true;
+                        });
                       },
                     ),
                     const SizedBox(height: 50),
-
-                    // Button Simpan
                     SizedBox(
                       width: double.infinity,
                       height: 56,

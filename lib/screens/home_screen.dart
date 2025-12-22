@@ -7,7 +7,6 @@ import 'package:apk_bakso/screens/transaksi_form_screen.dart';
 import 'package:apk_bakso/screens/rekap_screen.dart';
 import 'package:apk_bakso/services/auth_service.dart';
 import 'package:apk_bakso/services/transaksi_service.dart';
-import 'package:apk_bakso/services/menu_service.dart';
 import 'package:http/http.dart' as http;
 
 class HomeScreen extends StatefulWidget {
@@ -19,7 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _jumlahTransaksiBulanIni = 0;
-  int _jumlahMenu = 0;
+  int _totalQtyTerjualBulanIni = 0;
   bool _isLoadingStats = true;
 
   @override
@@ -34,26 +33,29 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final now = DateTime.now();
       final startOfMonth = DateTime(now.year, now.month, 1);
-      final endOfMonth = DateTime(now.year, now.month + 1, 0); // Hari terakhir bulan ini
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
-      // Ambil semua transaksi
       final transaksiList = await TransaksiService.getAllTransaksi();
 
-      // Filter transaksi bulan ini
       final transaksiBulanIni = transaksiList.where((t) {
         return t.tanggal.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
             t.tanggal.isBefore(endOfMonth.add(const Duration(days: 1)));
       }).toList();
 
-      // Hitung jumlah transaksi bulan ini
+      // Jumlah transaksi (header)
       final jumlahTransaksi = transaksiBulanIni.length;
 
-      // Hitung total qty terjual bulan ini (sum semua qty)
-      final totalQtyTerjual = transaksiBulanIni.fold<int>(0, (sum, t) => sum + t.qty);
+      // Total qty terjual dari semua detail
+      int totalQty = 0;
+      for (var transaksi in transaksiBulanIni) {
+        for (var detail in transaksi.details) {
+          totalQty += detail.qty;
+        }
+      }
 
       setState(() {
         _jumlahTransaksiBulanIni = jumlahTransaksi;
-        _jumlahMenu = totalQtyTerjual; // <--- Diubah jadi total qty, bukan jumlah menu
+        _totalQtyTerjualBulanIni = totalQty;
         _isLoadingStats = false;
       });
     } catch (e) {
@@ -74,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
-      // Ignore error server
+      // Ignore
     } finally {
       await AuthService().removeToken();
       if (context.mounted) {
@@ -170,10 +172,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 20),
                     Expanded(
                       child: _buildStatCard(
-                        icon: Icons.ramen_dining, // Icon lebih relevan untuk bakso/mangkok terjual
-                        // atau Icons.shopping_cart, Icons.bar_chart, atau Icons.trending_up
-                        title: 'Menu Bulan Ini',
-                        value: _isLoadingStats ? '...' : _jumlahMenu.toString(),
+                        icon: Icons.ramen_dining, // Icon mangkok bakso
+                        title: 'Qty Terjual Bulan Ini',
+                        value: _isLoadingStats ? '...' : _totalQtyTerjualBulanIni.toString(),
                       ),
                     ),
                   ],
@@ -309,7 +310,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 title,
                 style: const TextStyle(
                   fontSize: 13,
-
                   color: Color(0xFF3B4953),
                 ),
                 textAlign: TextAlign.center,
