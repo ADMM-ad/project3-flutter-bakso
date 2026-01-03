@@ -7,6 +7,7 @@ import 'package:apk_bakso/models/detail_transaksi.dart';
 import 'package:apk_bakso/services/menu_service.dart';
 import 'package:apk_bakso/services/paket_service.dart';
 import 'package:apk_bakso/services/transaksi_service.dart';
+import 'package:intl/intl.dart';
 
 class TransaksiEditScreen extends StatefulWidget {
   final Transaksi transaksi;
@@ -272,6 +273,11 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
     }
   }
 
+  String _formatRupiah(int amount) {
+    final formatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    return formatter.format(amount).replaceAll(',00', '');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -447,7 +453,7 @@ class _TransaksiEditScreenState extends State<TransaksiEditScreen> {
                                   const SizedBox(height: 8),
                                   Text('Banyaknya: ${detail.qty}', style: const TextStyle(color: Color(0xFF3B4953))),
                                   const SizedBox(height: 8),
-                                  Text('Total Item: Rp ${detail.harga}', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3B4953))),
+                                  Text('Total Item: ${_formatRupiah(detail.harga)}', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3B4953))),
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: IconButton(

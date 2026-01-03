@@ -19,6 +19,7 @@ class RekapScreen extends StatefulWidget {
 class _RekapScreenState extends State<RekapScreen> {
   List<dynamic> _data = [];
   List<String> _pakets = [];
+  Map<String, List<dynamic>> _detailMap = {};
   DateTimeRange _dateRange = DateTimeRange(
     start: DateTime(DateTime.now().year, DateTime.now().month, 1),
     end: DateTime(
@@ -56,17 +57,53 @@ class _RekapScreenState extends State<RekapScreen> {
       if (response.statusCode == 200) {
         final jsonData = jsonDecode(response.body);
         setState(() {
-          _data = jsonData['data'] ?? [];
-          _pakets = List<String>.from(jsonData['pakets'] ?? []);
+          _data = jsonData['data'] is List ? List<dynamic>.from(jsonData['data']) : [];
+          _pakets = jsonData['pakets'] is List ? List<String>.from(jsonData['pakets']) : ['total'];
+
+          // Parsing detailMap dengan AMAN
+          _detailMap = {};
+          if (jsonData['details'] != null) {
+            if (jsonData['details'] is Map) {
+              // Format normal: Map<String, dynamic>
+              final detailsRaw = jsonData['details'] as Map<String, dynamic>;
+              detailsRaw.forEach((key, value) {
+                if (value is List) {
+                  _detailMap[key] = List<dynamic>.from(value);
+                } else {
+                  _detailMap[key] = [value]; // Wrap single item dalam array
+                }
+              });
+            } else if (jsonData['details'] is List) {
+              // Jika API mengembalikan array (kasus error)
+              print('Warning: details adalah List, bukan Map');
+              _detailMap = {};
+            }
+          }
+
+          _isLoading = false;
+        });
+
+        // Debug print untuk memeriksa struktur
+        print('Data length: ${_data.length}');
+        print('Pakets: $_pakets');
+        print('DetailMap keys: ${_detailMap.keys.length}');
+
+      } else if (response.statusCode == 404 || response.statusCode == 204) {
+        // Handle response kosong dengan graceful
+        setState(() {
+          _data = [];
+          _pakets = ['total']; // Minimal header
+          _detailMap = {};
           _isLoading = false;
         });
       } else {
-        throw Exception('Gagal memuat rekap: ${response.body}');
+        throw Exception('Gagal memuat rekap: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      print('Error loading rekap: $e');
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Gagal memuat data: $e';
+        _errorMessage = 'Gagal memuat data: ${e.toString()}';
       });
     }
   }
@@ -228,7 +265,7 @@ class _RekapScreenState extends State<RekapScreen> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(2.0), // Jarak luar sangat kecil (tidak mepet, tapi minimal)
+        padding: const EdgeInsets.all(2.0),
         child: Card(
           elevation: 10,
           shadowColor: Colors.black.withOpacity(0.15),
@@ -247,7 +284,7 @@ class _RekapScreenState extends State<RekapScreen> {
                   fontSize: 16,
                   color: Color(0xFF3B4953),
                 ),
-                dataRowColor: MaterialStateProperty.all(Colors.white), // Tabel putih murni
+                dataRowColor: MaterialStateProperty.all(Colors.white),
                 dataTextStyle: const TextStyle(color: Color(0xFF3B4953)),
                 columns: [
                   const DataColumn(
@@ -268,11 +305,57 @@ class _RekapScreenState extends State<RekapScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                      ..._pakets.map(
-                            (paket) => DataCell(
-                          Text((row[paket] ?? 0).toString()),
-                        ),
-                      ),
+                      ..._pakets.map((paket) {
+                        final value = (row[paket] ?? 0).toString();
+                        final qty = int.tryParse(value) ?? 0;
+
+                        if (paket == 'total' || qty == 0) {
+                          return DataCell(Text(value));
+                        }
+
+                        return DataCell(
+                          GestureDetector(
+                            onTap: () {
+                              final key = '${row['nama_menu']}|$paket';
+                              final details = _detailMap[key] ?? [];
+
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text('${row['nama_menu']} - $paket'),
+                                  content: details.isEmpty
+                                      ? const Text('Tidak ada detail transaksi.')
+                                      : SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: details.map<Widget>((d) {
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 4),
+                                          child: Text('${d['nama_pelanggan']} ${d['qty']}x'),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Tutup'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Text(
+                              value,
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
                     ],
                   );
                 }).toList(),
